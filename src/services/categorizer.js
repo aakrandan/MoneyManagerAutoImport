@@ -94,34 +94,43 @@ const HEURISTIC_RULES = [
 
 /**
  * Exact keyword match: extractKeyword(narration) === pattern.keyword (case-insensitive)
+ * Prefers patterns whose incomeExpense type matches txnType.
  */
-function exactMatch(normalizedNarration, patternLibrary) {
+function exactMatch(normalizedNarration, patternLibrary, txnType) {
   const keyword = extractKeyword(normalizedNarration)
   if (!keyword) return null
   const key = keyword.toUpperCase()
-  return patternLibrary.find(p => p.keyword.toUpperCase() === key) ?? null
+  const all = patternLibrary.filter(p => p.keyword.toUpperCase() === key)
+  if (!all.length) return null
+  return all.find(p => p.incomeExpense === txnType) ?? all[0]
 }
 
 /**
  * Partial match: check whether any pattern keyword is a substring of the
  * normalized narration, or vice versa.
- * Returns the best (longest keyword) match.
+ * Returns the best (longest keyword) match, preferring txnType-matched patterns.
  */
-function partialMatch(normalizedNarration, patternLibrary) {
+function partialMatch(normalizedNarration, patternLibrary, txnType) {
   const narr = normalizedNarration.toUpperCase()
   let best = null
+  let bestTyped = null
   let bestLen = 0
+  let bestTypedLen = 0
 
   for (const pattern of patternLibrary) {
     const kw = pattern.keyword.toUpperCase()
     if (narr.includes(kw) || kw.includes(narr)) {
+      if (pattern.incomeExpense === txnType && kw.length > bestTypedLen) {
+        bestTyped = pattern
+        bestTypedLen = kw.length
+      }
       if (kw.length > bestLen) {
         best = pattern
         bestLen = kw.length
       }
     }
   }
-  return best
+  return bestTyped ?? best
 }
 
 /**
@@ -148,19 +157,15 @@ function heuristicMatch(normalizedNarration) {
 // ---------------------------------------------------------------------------
 
 function applyMatch(txn, match, source, confidence) {
-  // Respect the credit/debit hint from the PDF parser unless the pattern
-  // explicitly says Income (e.g. salary credits should not be flipped by
-  // a pattern that says Expense if the bank shows it as a credit)
-  let incomeExpense = match.incomeExpense || txn.incomeExpense
-  if (txn.credit != null && txn.debit == null && incomeExpense === 'Expense') {
-    incomeExpense = 'Income'
-  }
-  if (txn.debit != null && txn.credit == null && incomeExpense === 'Income') {
-    incomeExpense = 'Expense'
+  // The bank's credit/debit is authoritative for income/expense type.
+  // The pattern provides category/subcategory/note for the narration.
+  let incomeExpense = txn.incomeExpense  // 'Income' or 'Expense' set by PDF parser
+
+  // Transfer overrides the type regardless of bank classification
+  if (match.category === 'Transfer') {
+    incomeExpense = txn.debit != null ? 'Transfer-Out' : 'Transfer-In'
   }
 
-  // Transfer rows are excluded from export by default to prevent double-counting
-  // when the same transfer appears in two bank statements (once as debit, once as credit).
   const isTransfer = match.category === 'Transfer'
 
   return {
@@ -193,13 +198,15 @@ export function categorizeTransactions(transactions, patternLibrary) {
 
 function categorizeOne(txn, patternLibrary) {
   const normalized = normalizeNarration(txn.rawNarration)
+  // Determine the transaction type from the bank's credit/debit classification
+  const txnType = txn.credit != null && txn.debit == null ? 'Income' : 'Expense'
 
   // 1. Exact match against pattern library (confidence 1.0)
-  const exact = exactMatch(normalized, patternLibrary)
+  const exact = exactMatch(normalized, patternLibrary, txnType)
   if (exact) return applyMatch(txn, exact, 'pattern_exact', 1.0)
 
   // 2. Partial match against pattern library (confidence 0.8)
-  const partial = partialMatch(normalized, patternLibrary)
+  const partial = partialMatch(normalized, patternLibrary, txnType)
   if (partial) return applyMatch(txn, partial, 'pattern_partial', 0.8)
 
   // 3. Built-in heuristic rules (confidence 0.6)

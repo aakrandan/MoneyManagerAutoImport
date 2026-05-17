@@ -104,10 +104,12 @@ export async function parseMMExport(file) {
       ? normalizeIncomeExpense(String(row[cols.incomeExpense] ?? ''))
       : inferIncomeExpense(row[cols.amount])
 
-    if (!category || !description) continue
+    if (!category) continue
 
-    // Build a keyword from the description
-    const keyword = extractKeyword(description)
+    // Build a keyword from description; fall back to note if description is absent
+    const keywordSource = description || note
+    if (!keywordSource) continue
+    const keyword = extractKeyword(keywordSource)
     if (!keyword || keyword.length < 2) continue
 
     // Use uppercased keyword as dedup key
