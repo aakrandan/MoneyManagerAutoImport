@@ -23,6 +23,7 @@ async function extractTextItems(pdf) {
         text,
         x: Math.round(item.transform[4]),
         y: Math.round(item.transform[5]),
+        page: p,  // page number is required for correct cross-page ordering
       })
     }
   }
@@ -35,7 +36,12 @@ async function extractTextItems(pdf) {
 
 function groupIntoLines(items, yThreshold = 3) {
   if (!items.length) return []
-  const sorted = [...items].sort((a, b) => b.y - a.y || a.x - b.x)
+  // Sort by page ascending first — y-coordinates are page-local so items from
+  // different pages must not be interleaved when sorted by y alone.
+  // Within a page: y descending (top of page first), then x ascending.
+  const sorted = [...items].sort((a, b) =>
+    a.page !== b.page ? a.page - b.page : b.y - a.y || a.x - b.x
+  )
   const lines = []
   let current = [sorted[0]]
   let refY = sorted[0].y
