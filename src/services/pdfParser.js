@@ -1,12 +1,10 @@
-import * as pdfjsLib from 'pdfjs-dist'
+import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist'
+import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { isDateToken, parseStatementDate, formatDateISO } from '../utils/dateUtils'
 import { isAmountToken, parseAmount } from '../utils/stringUtils'
 
-// Set worker source for pdfjs v5
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url
-).href
+// Use Vite's ?url import — more reliable across browsers (incl. Safari)
+GlobalWorkerOptions.workerSrc = workerSrc
 
 // ---------------------------------------------------------------------------
 // Types (JSDoc only — no TypeScript)
@@ -336,7 +334,7 @@ function finalizeTransactions(rawTxns) {
  */
 export async function parsePDF(file) {
   const buffer = await file.arrayBuffer()
-  const pdf = await pdfjsLib.getDocument({ data: buffer }).promise
+  const pdf = await getDocument({ data: buffer }).promise
 
   const items = await extractTextItems(pdf)
   if (!items.length) throw new Error('No text found in PDF. Is it a scanned/image PDF?')
