@@ -317,7 +317,7 @@ function extractInlineNarration(line) {
 
 function finalizeTransactions(rawTxns) {
   return rawTxns
-    .filter(t => t.narration || t.debit || t.credit)
+    .filter(t => t.debit != null || t.credit != null)
     .map((t, i) => ({
       id: `txn_${String(i + 1).padStart(3, '0')}`,
       date: t.date,
