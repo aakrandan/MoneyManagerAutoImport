@@ -24,6 +24,9 @@ async function extractTextItems(pdf) {
     const page = await pdf.getPage(p)
     const content = await page.getTextContent()
     for (const item of content.items) {
+      // pdfjs v5 returns TextItem and TextMarkedContent objects mixed together.
+      // TextMarkedContent has no 'str' or 'transform' — skip them.
+      if (typeof item.str !== 'string') continue
       const text = item.str
       if (!text.trim()) continue
       allItems.push({
