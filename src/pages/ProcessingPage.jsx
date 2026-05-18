@@ -21,7 +21,7 @@ export default function ProcessingPage() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (!processingFiles?.pdf) {
+    if (!processingFiles?.statement) {
       setCurrentPage('upload')
       return
     }
@@ -31,10 +31,18 @@ export default function ProcessingPage() {
 
   async function run() {
     try {
-      // Step 1 — Parse PDF (dynamic import keeps initial bundle lean)
+      // Step 1 — Parse statement (PDF, XLSX or CSV)
       setStepIndex(0)
-      const { parsePDF } = await import('../services/pdfParser')
-      const rawTxns = await parsePDF(processingFiles.pdf)
+      const file = processingFiles.statement
+      const ext = file.name.split('.').pop().toLowerCase()
+      let rawTxns
+      if (ext === 'pdf') {
+        const { parsePDF } = await import('../services/pdfParser')
+        rawTxns = await parsePDF(file)
+      } else {
+        const { parseBankStatement } = await import('../services/bankStatementParser')
+        rawTxns = await parseBankStatement(file)
+      }
 
       // Step 2 — Load MM export patterns (if provided)
       setStepIndex(1)

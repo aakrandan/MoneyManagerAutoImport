@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 
-export default function FileUploadZone({ label, accept, file, onChange, required = false }) {
+export default function FileUploadZone({ label, hint, accept, file, onChange, required = false }) {
   const inputRef = useRef(null)
   const [dragging, setDragging] = useState(false)
 
@@ -71,7 +71,10 @@ export default function FileUploadZone({ label, accept, file, onChange, required
             {required && <span className="text-red-500 ml-1">*</span>}
           </p>
           <p className="text-xs text-gray-400">Drag & drop or click to browse</p>
-          <p className="text-xs text-gray-400">{accept}</p>
+          {hint
+            ? <p className="text-xs text-gray-400">{hint}</p>
+            : <p className="text-xs text-gray-400">{accept}</p>
+          }
         </div>
       )}
     </div>
